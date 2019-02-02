@@ -51,7 +51,56 @@ def contrast_stretching(img, E):
     cs = 1 / ( 1 + (M / (img + np.spacing(1))) ** E)
     return np.float32(cs)
 
-
+def pcs(img, tx = 0.1):
+    '''
+    source: http://interscience.in/IJPPT_Vol2Iss1/29-34.pdf
+    
+    Partial  contrast  is  an  auto  scaling  method.  It  is  a  
+    linear   mapping   function   that   is   usually   used   to   
+    increase the contrast level and brightness level of the 
+    image.  This  technique  will  be  based  on  the  original  
+    brightness  and  contrast  level  of  the  images  to  do  the  
+    adjustment.  
+    
+    r_max,  b_max  and  g_max  are  the  maximum  
+    color level for each red, blue and green color palettes, 
+    respectively. r_min, b_min and g_min are the 
+    minimum  value  for  each  color  palette,  respectively.  
+    maxTH  and  minTH  are  the  average  number  of  these  
+    maximum  and  minimum  color  levels  for  each  color  
+    space. 
+    
+    '''
+    r, g, b = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    r_min = r.reshape((r.shape[0]*r.shape[1], 1)).min(axis=0)
+    g_min = g.reshape((g.shape[0]*g.shape[1], 1)).min(axis=0)
+    b_min = b.reshape((b.shape[0]*b.shape[1], 1)).min(axis=0)
+    r_max = r.reshape((r.shape[0]*r.shape[1], 1)).max(axis=0)
+    g_max = g.reshape((g.shape[0]*g.shape[1], 1)).max(axis=0)
+    b_max = b.reshape((b.shape[0]*b.shape[1], 1)).max(axis=0)
+    minTH = (r_min + g_min + b_min)/3
+    maxTH = (r_max + g_max + b_max)/3
+    NminTH = minTH - minTH * tx
+    NminTH = 0 if NminTH < 0 else NminTH
+    NmaxTH = maxTH + (255 - maxTH) * tx
+    NmaxTH = 255 if NmaxTH > 255 else NmaxTH
+    
+    #print('minTH {}, Nmin {}, maxTH {}, Nmax {}'.format(minTH, NminTH, maxTH, NmaxTH))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  
+    _min = img.reshape((img.shape[0]*img.shape[1], 1)).min(axis=0)
+    output = np.zeros_like(img)
+    
+    for x in range(img.shape[0]):
+        for y in range(img.shape[1]):
+            
+            if img[x, y] > minTH :
+                output[x,y] = (img[x,y]/minTH) * NminTH
+            elif minTH <= img[x, y] and img[x, y] <= maxTH :
+                output[x,y] = (((NmaxTH - NminTH)/(maxTH - minTH)) * (img[x,y] - _min)) + _min
+            elif img[x, y] < maxTH :
+                output[x,y] = (img[x,y]/maxTH) * maxTH
+                
+    return output
 
 def find_microenvironments(img2print, mask, area_min = 3000, count_cnt_min = 100):    
     mask = mask.copy()
@@ -122,8 +171,9 @@ def counter_me(me, ix):
     return row
     
     
-def save_img(img, ix):    
+def save_img(img, mask, ix):    
    cv2.imwrite('./outputs/out_{}.png'.format(ix),img)
+   cv2.imwrite('./outputs/out_mask_{}.png'.format(ix),mask)
 
 def process(index):
     
@@ -137,12 +187,12 @@ def process(index):
     for ix in indexs:
         print(ix)
         images = load_images(ix)
-        cs = contrast_stretching(images[0], 0.1)
+        cs = pcs(images[0], 0.1)
         logtrans = log_transformation(0.9, cs)
         blur = cv2.medianBlur(logtrans,5)
-        kmask = kmeans(blur)
+        kmask = kmeans(blur)        
         me, img, mask = find_microenvironments(images[1], kmask)
-        save_img(img, ix)
+        save_img(img,kmask, ix)
         df.loc[len(df)] = counter_me(me, ix)
 
     df.to_csv('./outputs/output.csv')
