@@ -31,6 +31,20 @@ def kmeans(image):
     reshaped = image.reshape(image.shape[0] * image.shape[1], shape_2)
     kmeans = KMeans(n_clusters=2, n_init=40, max_iter=500).fit(reshaped)
     clustering = np.reshape(np.array(kmeans.labels_, dtype=np.uint8), (image.shape[0], image.shape[1]))
+    
+    '''
+    all_black = True
+    for i in range(len(clustering)):
+        if clustering[i][0] == 1:
+            all_black = False
+            break
+    
+    if(not all_black):
+        ret,thresh2 = cv2.threshold(clustering,127,255,cv2.THRESH_BINARY_INV)
+        clustering = thresh2
+    
+    '''
+    
     return clustering
 
 def contrast_stretching(img, E):
@@ -102,11 +116,32 @@ def pcs(img, tx = 0.1):
                 
     return output
 
-def find_microenvironments(img2print, mask, area_min = 3000, count_cnt_min = 100):    
+def find_microenvironments(img2print, mask, type_img=1 ):    
     mask = mask.copy()
     img2print = img2print.copy()
     _mask = np.zeros_like(img2print)
     microenvironments = []
+    
+    
+    if type_img == 1:
+        area_min = 3000
+        count_cnt_min = 100
+        plus = 50
+        max_r = 200
+        text_size = 5
+    elif type_img == 2:
+        area_min = 1500
+        count_cnt_min = 50
+        plus = 25
+        max_r = 100
+        text_size = 2
+    elif type_img == 3:
+        area_min = 300 
+        count_cnt_min = 10
+        plus = 12
+        max_r = 50
+        text_size = 1
+        
 
     _, contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
@@ -126,12 +161,12 @@ def find_microenvironments(img2print, mask, area_min = 3000, count_cnt_min = 100
         _e = list(cv2.fitEllipse(cnt))
         
         #excluindo raios muito grandes
-        if(_e[1][0] > 200 or _e[1][1] > 200):
+        if(_e[1][0] > max_r or _e[1][1] > max_r):
             continue
         
         #aumentando os raios da elipse para exluir algum erro.
         #print(area, len(cnt), _e[1])
-        _e[1] = (_e[1][0] + 50, _e[1][1] + 50)
+        _e[1] = (_e[1][0] + plus, _e[1][1] + plus)
         ellipse = tuple(_e) 
         
         mask = np.zeros_like(img2print)
@@ -139,12 +174,17 @@ def find_microenvironments(img2print, mask, area_min = 3000, count_cnt_min = 100
         masked = np.bitwise_and(img2print, mask)
         microenvironments.append(masked)
         cv2.ellipse(img2print, ellipse, (0,255,0), 4)
-        cv2.putText(img2print,str(len(microenvironments) - 1), (int(ellipse[0][0]), int(ellipse[0][1])), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
+        cv2.putText(img2print,
+                    str(len(microenvironments) - 1), 
+                    (int(ellipse[0][0]) - plus, int(ellipse[0][1])),
+                    cv2.FONT_HERSHEY_SIMPLEX, 
+                    text_size, 
+                    255,
+                    2)
         cv2.ellipse(_mask, ellipse, (255,255,255), -1)
         
     
     return (microenvironments, img2print, _mask)
-
 
 def counter_me(me, ix):
     row = ['{}'.format(ix), '-','-','-','-','-','-','-','-','-','-']
