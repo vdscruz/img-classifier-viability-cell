@@ -1,4 +1,4 @@
-# img-classifier-viability-cell
+# Segmentação de imagem com KMeans no processo de automatização de análise de viabilidade celular
 Conclusion project of Udacity's Nanodegree Machine Learning. Classification of image for to solve problem with analisis of cell viability. 
 
 Bibliotecas usadas
